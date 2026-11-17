@@ -14,6 +14,7 @@ run_sizes:
   # decoding slots per session a replica holds on average: a replica's share of the sessions drifts above the mean
   seqs_per_session: 2
   seqs_per_agent_worker: 8  # decoding slots per agent-loop process (templating, image processing, the calls)
+  single_node_split: false  # check one colocated node can reserve a trainer GPU and a separate rollout GPU
 
 algorithm:
   adv_estimator: grpo  # a sample's advantage within its group: no critic
@@ -52,11 +53,12 @@ actor_rollout_ref:
     strategy: fsdp2
     use_kl_loss: false  # no reference policy
     fsdp_config:
-      _target_: pear.trainer.config.PearFSDPEngineConfig  # verl's FSDP engine config with the two keys below
+      _target_: pear.trainer.config.PearFSDPEngineConfig  # verl's FSDP config with PEAR's kernel and optimizer options
       # A model family's training kernels, by class path (pear/models/kernels.py); null: verl's engine as it is
       kernels: null
       # Whether the kernels install the backend of the machine's GPU generation beside what they install on any GPU
       use_gpu_backend: false
+      use_streamed_adamw: null  # null: existing automatic choice; true: also stream on portable training kernels
   rollout:
     _target_: pear.rollout.config.PearRolloutConfig  # verl's rollout config with the two keys below
     name: vllm  # PEAR's vLLM replica, which pear.rollout.server registers under verl's name

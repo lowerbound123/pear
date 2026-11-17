@@ -223,6 +223,33 @@ def test_async_dapo_reports_the_pass_rates_of_the_groups_it_judged(tq_init, part
         _clear_partition(partition_id)
 
 
+def test_an_async_filter_budget_stops_zero_variance_refills(tq_init, partition_id):
+    refiller = FakeRefiller(partition_id, global_steps=1, sessions=2, rewards=[0.0, 0.0])
+    rb = _replay_buffer(
+        refiller, rollout_n=2, max_inflight_sessions=2, filter_groups_metric="acc", filter_group_budget=3
+    )
+    consumer = SampleConsumer(rb, partition_id=partition_id, batch_size=1)
+    consumer.start()
+    try:
+        with pytest.raises(RuntimeError, match="filter budget"):
+            consumer.result_or_raise()
+        assert len(refiller.produced_uids) == 3
+    finally:
+        _clear_partition(partition_id)
+
+
+def test_an_async_filter_budget_allows_a_completed_batch_at_the_limit(tq_init, partition_id):
+    refiller = FakeRefiller(partition_id, global_steps=1, sessions=2, rewards=[0.0, 1.0])
+    rb = _replay_buffer(
+        refiller, rollout_n=2, max_inflight_sessions=2, filter_groups_metric="acc", filter_group_budget=1
+    )
+    try:
+        batch, _ = rb.sample(global_steps=1, partition_id=partition_id, batch_size=1)
+        assert _uids_of(batch.keys) == set(refiller.produced_uids)
+    finally:
+        _clear_partition(partition_id)
+
+
 def test_the_pass_rates_are_also_reported_over_each_tool_s_groups(tq_init, partition_id):
     arm = PromptSpec(uid=_uid(), status="finished", sessions=2, rewards=[1.0, 0.0])
     arm_solved = PromptSpec(uid=_uid(), status="finished", sessions=2, rewards=[1.0, 1.0])

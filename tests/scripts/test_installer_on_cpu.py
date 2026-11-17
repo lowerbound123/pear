@@ -379,6 +379,15 @@ def test_on_an_h100_flash_attn_3_is_built_too(installer):
     assert any("FLASH_ATTN_CUDA_ARCHS=90" in call for call in installer.calls("uv pip"))
 
 
+def test_on_an_a800_only_flash_attn_2_is_installed(installer):
+    process = installer.run("verl", GPU_ARCH="8.0")
+    assert process.returncode == 0, process.stderr
+    calls = installer.calls("uv pip")
+    assert any("TORCH_CUDA_ARCH_LIST=8.0 FLASH_ATTN_CUDA_ARCHS=80" in call for call in calls)
+    assert not any("flash-attn-3" in call or "flash-attn-4" in call for call in calls)
+    assert not [call for call in installer.calls("python") if "bdist_wheel" in call]
+
+
 @pytest.mark.parametrize(("variables", "job_n"), [({"CPU_N": "16"}, "16"), ({"MAX_JOBS": "4"}, "4")])
 def test_a_build_takes_no_more_jobs_than_the_machine_has_cpus_or_the_caller_names(installer, variables, job_n):
     installer.run("verl", GPU_ARCH="10.3", **variables)

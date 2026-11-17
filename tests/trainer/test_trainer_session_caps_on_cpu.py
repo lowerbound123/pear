@@ -381,6 +381,19 @@ def test_the_replay_buffer_takes_the_arguments_verl_s_trainer_builds_its_own_wit
     assert trainer._build_replay_buffer().sync_refill_failed_groups is True
 
 
+@pytest.mark.parametrize("enabled, max_batches, expected", [(True, 8, 16), (True, 0, None), (False, 8, None)])
+def test_the_capped_trainer_passes_a_judged_group_budget(monkeypatch, enabled, max_batches, expected):
+    trainer = PearTrainer.__new__(PearTrainer)
+    trainer.config = OmegaConf.create({
+        "algorithm": {"filter_groups": {"enable": enabled, "max_num_gen_batches": max_batches}},
+        "data": {"train_batch_size": 2},
+        "actor_rollout_ref": {"rollout": {"n": 4}},
+        "trainer": {"v1": {"sampler": {"max_inflight_sessions": 8}}},
+    })
+    monkeypatch.setattr(trainer, "_session_caps_by_tool", lambda: {})
+    assert trainer._replay_buffer_kwargs({})["filter_group_budget"] == expected
+
+
 @pytest.mark.parametrize("max_inflight_sessions, batches_submitted", [(None, 1), (384, 0)])
 def test_prepare_step_submits_a_batch_only_without_a_session_cap(
     monkeypatch, tool_config_path, max_inflight_sessions, batches_submitted

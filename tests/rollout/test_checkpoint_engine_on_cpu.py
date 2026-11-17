@@ -67,3 +67,23 @@ def test_the_sender_keeps_the_fp32_modules_in_fp32():
     sent = engine._cast_for_send([(name, FP32_VALUES) for name in names])
 
     assert [tensor.dtype for _, tensor in sent] == [torch.float32, torch.float32, torch.bfloat16]
+
+
+def test_shared_embeddings_are_synced_once_and_keep_their_alias_on_load():
+    model = torch.nn.Module()
+    model.embed_tokens = torch.nn.Embedding(16, 8)
+    model.lm_head = torch.nn.Linear(8, 16, bias=False)
+    model.lm_head.weight = model.embed_tokens.weight
+    model.visual = torch.nn.Linear(8, 8)
+    # The same portable head wrapper is installed on 4B; installing it must not untie the parameter.
+    from pear.models.qwen3_5.trainer.head import Fp32Head
+
+    Fp32Head.install(model.lm_head)
+    engine = object.__new__(PearNCCLCheckpointEngine)
+    engine.rollout_dtype, engine.fp32_modules = torch.bfloat16, Fp32Modules(FP32_MODULES)
+    sent = dict(engine._cast_for_send(model.named_parameters()))
+    assert "embed_tokens.weight" in sent and "lm_head.weight" not in sent
+    assert sent["embed_tokens.weight"].dtype == torch.bfloat16
+    assert sent["visual.weight"].dtype == torch.float32
+    model.load_state_dict(model.state_dict())
+    assert model.lm_head.weight is model.embed_tokens.weight

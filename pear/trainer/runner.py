@@ -9,6 +9,7 @@ from omegaconf import DictConfig, OmegaConf
 from pear.agent_loop.manager import PearAgentLoopManager
 from pear.rollout.server import PearVLLMReplica
 from pear.trainer.trainer import PearTrainer
+from pear.utils.cluster import check_single_node_split
 from pear.utils.logging_utils import get_logger
 from verl.trainer.ppo.v1 import AgentLoopManagerTQ
 from verl.trainer.ppo.v1.trainer_base import PPOTrainer
@@ -30,6 +31,9 @@ class PearTaskRunner(ABC):
         OmegaConf.resolve(config)
         # this process builds the replicas: with another class registered they would serve without PEAR's server
         PearVLLMReplica.require_registered(config.actor_rollout_ref.rollout.name)
+
+        if config.get("run_sizes", {}).get("single_node_split", False):
+            check_single_node_split(config, ray.nodes(), ray.available_resources())
 
         tq.init(config.transfer_queue)
         trainer = None

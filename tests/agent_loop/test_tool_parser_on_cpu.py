@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from pear.agent_loop.tool_parser import JsonBlockToolParser, NoToolCall
-from pear.models.qwen3_5.tool_parser import Qwen3_8ToolParser
+from pear.models.qwen3_5.tool_parser import Qwen3_5ToolParser, Qwen3_8ToolParser
 from verl.experimental.agent_loop.tool_parser import ToolParser
 
 TOOLS = [SimpleNamespace(function=SimpleNamespace(name="act"))]
@@ -29,6 +29,15 @@ class Answer:
 def test_the_format_qwen3_8_builds_the_familys_parser():
     # the registration runs on import of the family's module, which the recipes have verl import in every process
     assert type(ToolParser.get_tool_parser("qwen3_8", CharacterTokenizer())) is Qwen3_8ToolParser
+
+
+def test_the_format_qwen3_5_uses_the_same_action_protocol():
+    parser = ToolParser.get_tool_parser("qwen3_5", CharacterTokenizer())
+    assert type(parser) is Qwen3_5ToolParser
+    text = f'<think>```json\n{{"x": 0}}\n```</think>```json\n{ACTION}\n```'
+    assert Answer.parsed(Qwen3_5ToolParser, text)[1][0].arguments == ACTION
+    with pytest.raises(NoToolCall):
+        Answer.parsed(Qwen3_5ToolParser, '<think>```json\n{"x": 0}\n```</think>')
 
 
 def test_the_call_is_the_last_json_block_after_the_thinking():

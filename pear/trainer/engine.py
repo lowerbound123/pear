@@ -64,8 +64,12 @@ class PearFSDPEngine(FSDPEngineWithLMHead):
     def _build_model_optimizer(self) -> None:
         super()._build_model_optimizer()
 
-        # with the GPU backend, optimizer_offload_step streams the states through the device in chunks
-        if self.use_gpu_backend and self.engine_config.optimizer_offload_step:
+        # Keep the original automatic choice; an explicit switch enables streaming on portable kernels too.
+        requested = getattr(self.engine_config, "use_streamed_adamw", None)
+        stream = self.use_gpu_backend if requested is None else requested
+        if stream and self.engine_config.optimizer_offload_step:
+            if getattr(self, "scaler", None) is not None:
+                raise ValueError("streamed AdamW requires training without a gradient scaler")
             self.streamed_adamw = StreamedAdamW(self.optimizer)
 
     def _build_module(self) -> torch.nn.Module:
@@ -162,9 +166,13 @@ class StreamedAdamW:
     # multi-tensor AdamW that AdamW.step runs (its updates are per tensor, so chunking changes nothing) and another
     # stream writes the chunk before back; the step counters stay on the host, so the bias corrections need no sync.
     def __init__(self, optimizer: torch.optim.AdamW):
+        if type(optimizer) is not torch.optim.AdamW or len(optimizer.param_groups) != 1:
+            raise ValueError("streamed AdamW requires ordinary AdamW with one parameter group")
         (group,) = optimizer.param_groups
-        if group["fused"] or group["foreach"] is False:
-            raise ValueError("the streamed AdamW step runs torch's multi-tensor AdamW, not a fused or for-loop one")
+        if group["fused"] or group["foreach"] is False or any(
+            group.get(name, False) for name in ("amsgrad", "capturable", "differentiable")
+        ):
+            raise ValueError("streamed AdamW requires non-fused multi-tensor AdamW without amsgrad, capturable or differentiable")
 
         self.optimizer = optimizer
         self.h2d = torch.cuda.Stream()

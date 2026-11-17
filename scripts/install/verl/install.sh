@@ -4,7 +4,7 @@
 # FlashInfer's precompiled kernels, flash-attn and the patched LMCache wheel (3rdparty/LMCache).
 #   WORK_DIR=<work dir> bash scripts/install.sh verl
 #   NO_GPU=1: without what is compiled for a GPU, which is what the CPU tests need
-#   CUDA_ARCH=<compute capability>: the GPU to compile for (10.3 a GB300, 9.0 an H100) when it is not the machine's own
+#   CUDA_ARCH=<compute capability>: 8.0 for A800, 9.0 for H100/H200, 10.3 for GB300
 #   MAX_JOBS=<n>: the parallel compile jobs of every source build
 set -euo pipefail
 
@@ -176,7 +176,9 @@ if [ -z "${NO_GPU:-}" ]; then
   install_flash_attn_2
   # flash-attn 4 (CuTe DSL kernels, Blackwell) for the actor. Without its dependencies: its apache-tvm-ffi requirement
   # conflicts with vLLM's, and the CuTe DSL comes at the version of overrides.txt. Its pinned version is a pre-release.
-  uv pip install --python "$PYTHON" --no-deps --prerelease=allow flash-attn-4
+  if [ "$CUDA_ARCH" != "$AMPERE_CUDA_ARCH" ]; then
+    uv pip install --python "$PYTHON" --no-deps --prerelease=allow flash-attn-4
+  fi
   if [ "$CUDA_ARCH" = "$HOPPER_CUDA_ARCH" ]; then
     install_flash_attn_3
   fi

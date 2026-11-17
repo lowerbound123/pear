@@ -19,12 +19,15 @@ class PearReplayBuffer(ReplayBufferAsync):
         rollout_n: int,
         max_inflight_sessions: int | None,
         max_inflight_sessions_by_tool: dict[str, int] | None,
+        filter_group_budget: int | None = None,
         **replay_buffer_kwargs,
     ) -> None:
         # set before the parent's constructor, which validates them (_validate_mode_config)
         self.rollout_n = rollout_n
         self.max_inflight_sessions = max_inflight_sessions
         self.max_inflight_sessions_by_tool = dict(max_inflight_sessions_by_tool or {})
+        self.filter_group_budget = filter_group_budget
+        self._judged_group_counts = Counter()
         super().__init__(**replay_buffer_kwargs)
 
         # partition_id => {prompt_key: the tools its row selects}, which the session cap per tool counts it under
@@ -33,6 +36,8 @@ class PearReplayBuffer(ReplayBufferAsync):
         self._group_pass_rates: dict[str, list[tuple[float, list[str] | None]]] = defaultdict(list)
 
     def _validate_mode_config(self) -> None:
+        if self.filter_group_budget is not None and self.filter_group_budget < 1:
+            raise ValueError("filter_group_budget must be positive or None")
         if self.max_inflight_sessions_by_tool and self.max_inflight_sessions is None:
             raise ValueError("max_inflight_sessions_by_tool caps tools within max_inflight_sessions, which it requires")
 
@@ -55,6 +60,35 @@ class PearReplayBuffer(ReplayBufferAsync):
     def _on_group_judged(self, partition_id: str, uid: str, values: list[float]) -> None:
         tool_selection = self.prompt_tool_selections[partition_id].get(uid)
         self._group_pass_rates[partition_id].append((float(np.mean(values)), tool_selection))
+        self._judged_group_counts[partition_id] += 1
+
+    def wait_for_sampleable(self, global_steps: int, partition_id: str, target_count: int) -> tuple[set[str], dict]:
+        self._judged_group_counts[partition_id] = 0
+        try:
+            return super().wait_for_sampleable(global_steps, partition_id, target_count)
+        finally:
+            self._judged_group_counts.pop(partition_id, None)
+
+    def _filter_budget_spent(self, partition_id: str) -> bool:
+        return (
+            partition_id != "val"
+            and self.filter_groups_metric is not None
+            and self.filter_group_budget is not None
+            and self._judged_group_counts[partition_id] >= self.filter_group_budget
+        )
+
+    def _has_enough_samples(
+        self, global_steps: int, partition_id: str, batch_size: int, sampleable_keys: set[str]
+    ) -> bool:
+        # A complete batch at the boundary wins; otherwise fail instead of silently refilling forever.
+        enough = super()._has_enough_samples(global_steps, partition_id, batch_size, sampleable_keys)
+        if not enough and self._filter_budget_spent(partition_id):
+            raise RuntimeError(
+                f"async filter budget exhausted after {self._judged_group_counts[partition_id]} judged groups; "
+                f"only {len(sampleable_keys)}/{batch_size} groups are sampleable. Inspect rewards and truncation; "
+                "increase algorithm.filter_groups.max_num_gen_batches or use SMOKE=1 for a connectivity check."
+            )
+        return enough
 
     def _refill_evicted(self, evicted_uids: set[str]) -> None:
         # with a session cap, finished and evicted groups alike free room that _refill_free_room refills up to the cap
@@ -62,7 +96,7 @@ class PearReplayBuffer(ReplayBufferAsync):
             super()._refill_evicted(evicted_uids)
 
     def _refill_free_room(self, partition_id: str) -> bool:
-        if self.max_inflight_sessions is None or partition_id == "val":
+        if self.max_inflight_sessions is None or partition_id == "val" or self._filter_budget_spent(partition_id):
             return False
 
         free_groups = (self.max_inflight_sessions - self._inflight_sessions(partition_id)) // self.rollout_n

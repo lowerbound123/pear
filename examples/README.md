@@ -9,3 +9,5 @@ recipe runs on the head of a Ray cluster, and its extra arguments are Hydra over
     station that runs with it
 - **[eval](eval/README.md)**: One evaluation per benchmark: LIBERO, LIBERO-Plus, LIBERO-Pro, RoboDojo, RoboLab-120
   and nine general benchmarks
+- **[models/qwen3_5_4b](models/qwen3_5_4b/README.md)**: Small LIBERO training, export and evaluation on two A800 80GB
+  GPUs in one machine, one trainer GPU and one rollout GPU; static checks only, GPU validation pending

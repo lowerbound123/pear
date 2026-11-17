@@ -1,0 +1,49 @@
+# @package _global_
+# Portable Qwen3.5 path for Ampere. Keep precision handling and fused score centering, without the 27B kernels.
+data:
+  image_patch_size: 16
+  pixel_dtype: bf16
+
+actor_rollout_ref:
+  model:
+    use_fused_kernels: true
+    fused_kernel_options:
+      impl_backend: torch
+    liger_kwargs:
+      rms_norm: false
+    override_config:
+      attn_implementation:
+        text_config: flash_attention_2
+        vision_config: sdpa
+  actor:
+    fsdp_config:
+      mixed_precision:
+        fp32_modules: [model.visual]
+        fp32_modules_tf32: true
+        fp32_residual: true
+      kernels: pear.models.qwen3_5.trainer.training_kernels.Qwen3_5TrainingKernels
+      use_gpu_backend: false
+  rollout:
+    dtype: bfloat16
+    fp32_modules: [visual, A_log]
+    kernels: null
+    standalone_gpu_memory_utilization: 0.70
+    custom:
+      lmcache:
+        enable: false
+    multi_turn:
+      format: qwen3_5
+    engine_kwargs:
+      vllm:
+        mamba_cache_mode: align
+        mm_encoder_attn_backend: TORCH_SDPA
+        attention_config:
+          backend: FLASH_ATTN
+          flash_attn_version: 2
+        additional_config:
+          gdn_prefill_backend: triton
+
+transfer_queue:
+  backend:
+    SimpleStorage:
+      num_data_storage_units: 4

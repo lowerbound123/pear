@@ -19,6 +19,7 @@ RUN=${RUN:?the run directory}
 TRAINER_NNODES=${TRAINER_NNODES:?the machines started as trainer}
 ROLLOUT_NNODES=${ROLLOUT_NNODES:?the machines started as rollout}
 MODEL=${MODEL:-$WORK_DIR/models/Qwen3.8-27B}
+MODEL_FILE=${MODEL_FILE:-$ROOT/examples/models/qwen3_8_27b_pear/qwen3_8_27b.sh}
 VERL_ENV=${VERL_ENV:-$WORK_DIR/envs/verl}
 # the head's own disk: the LOCAL_DIR scripts/start_ray_node.sh got there, with the caches of what is compiled
 LOCAL_DIR=${LOCAL_DIR:-/var/tmp/${USER:-$(id -un)}/pear}
@@ -44,7 +45,10 @@ LOGGER=${LOGGER:-'["console","file","tensorboard"]'}
 MAX_MODEL_LEN=$((MAX_PROMPT + MAX_RESPONSE))
 # the model on this GPU: its arguments, its sizes, its answer parser and its image tokens
 # shellcheck source=../qwen3_8_27b.sh
-source "$ROOT/examples/models/qwen3_8_27b_pear/qwen3_8_27b.sh"
+source "$MODEL_FILE"
+# A small single-machine run can reserve one GPU for each pool; existing recipes use every GPU of their machines.
+TRAINER_GPUS_PER_NODE=${TRAINER_GPUS_PER_NODE:-$GPUS_PER_NODE}
+ROLLOUT_GPUS_PER_NODE=${ROLLOUT_GPUS_PER_NODE:-$GPUS_PER_NODE}
 
 # ---- derived ----
 TOOL_CONFIG=$ROOT/pear/envs/libero/configs/tool_config.yaml
@@ -70,7 +74,7 @@ DATA_ARGS=(
 
 ROLLOUT_ARGS=(
   actor_rollout_ref.rollout.nnodes="$ROLLOUT_NNODES"
-  actor_rollout_ref.rollout.n_gpus_per_node="$GPUS_PER_NODE"
+  actor_rollout_ref.rollout.n_gpus_per_node="$ROLLOUT_GPUS_PER_NODE"
   actor_rollout_ref.rollout.n="$N"
   actor_rollout_ref.rollout.max_model_len="$MAX_MODEL_LEN"
   +actor_rollout_ref.rollout.limit_images="$LIMIT_IMAGES"
@@ -85,7 +89,7 @@ ACTOR_ARGS=(
 TRAINER_ARGS=(
   # the run directory: the config takes the workers' paths from it
   run_dir="$RUN_DIR"
-  trainer.n_gpus_per_node="$GPUS_PER_NODE"
+  trainer.n_gpus_per_node="$TRAINER_GPUS_PER_NODE"
   trainer.nnodes="$TRAINER_NNODES"
   trainer.validation_data_dir="$RUN/val_dumps"
   trainer.total_training_steps="$STEPS"

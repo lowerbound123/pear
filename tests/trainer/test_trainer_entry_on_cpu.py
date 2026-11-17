@@ -37,6 +37,7 @@ EVERY_RUN_OVERRIDES = [
     "actor_rollout_ref.actor.fsdp_config._target_=pear.trainer.config.PearFSDPEngineConfig",
     "+actor_rollout_ref.actor.fsdp_config.kernels=null",
     "+actor_rollout_ref.actor.fsdp_config.use_gpu_backend=false",
+    "+actor_rollout_ref.actor.fsdp_config.use_streamed_adamw=null",
     "algorithm.adv_estimator=grpo",
     "algorithm.use_kl_in_reward=False",
     "data.image_key=images",
@@ -67,7 +68,7 @@ EVERY_RUN_OVERRIDES = [
     "transfer_queue.backend.SimpleStorage.num_data_storage_units=32",
     # the run's directory, which a recipe gives, and the workers' paths the config takes from it
     "+run_dir='???'",
-    "+run_sizes={sessions_per_replica: null, seqs_per_session: 2, seqs_per_agent_worker: 8}",
+    "+run_sizes={sessions_per_replica: null, seqs_per_session: 2, seqs_per_agent_worker: 8, single_node_split: false}",
     "+ray_kwargs.ray_init.runtime_env.env_vars.WANDB_DIR=${run_dir}",
     "+ray_kwargs.ray_init.runtime_env.env_vars.PEAR_LOG_DIR=${run_dir}/sim",
     "+ray_kwargs.ray_init.runtime_env.env_vars.TENSORBOARD_DIR=${run_dir}/tensorboard",

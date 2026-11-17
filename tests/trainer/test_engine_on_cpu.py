@@ -5,6 +5,7 @@ import torch
 from tensordict import TensorDict
 
 from pear.models.kernels import TrainingKernels
+from pear.trainer import engine as engine_module
 from pear.trainer.config import PearFSDPEngineConfig
 from pear.trainer.engine import PearFSDPEngine
 from verl.utils import tensordict_utils as tu
@@ -160,6 +161,39 @@ def test_the_streamed_step_takes_over_once_the_states_live_on_the_host(events, r
 
     # states not all on the host take verl's update
     assert events == [("streamed step",) if ready else ("step",)]
+
+
+@pytest.mark.parametrize(
+    "backend, requested, offload_step, expected",
+    [
+        (False, True, True, True), (False, None, True, False), (True, None, True, True),
+        (True, False, True, False), (True, None, False, False),
+    ],
+)
+def test_streamed_adamw_can_be_enabled_without_specialized_kernels(monkeypatch, backend, requested, offload_step, expected):
+    engine = EngineUnderTest.of(
+        use_gpu_backend=backend, use_streamed_adamw=requested, optimizer_offload_step=offload_step
+    )
+    optimizer = object()
+    monkeypatch.setattr(FSDPEngineWithLMHead, "_build_model_optimizer", lambda self: setattr(self, "optimizer", optimizer))
+    monkeypatch.setattr(engine_module, "StreamedAdamW", lambda value: ("streamed", value))
+    engine._build_model_optimizer()
+    assert engine.streamed_adamw == (("streamed", optimizer) if expected else None)
+
+
+@pytest.mark.parametrize("changes", [{"optimizer_offload": False}, {"optimizer_offload_step": False}, {"forward_only": True}])
+def test_explicit_streaming_requires_training_with_step_offload(changes):
+    settings = dict(strategy="fsdp2", use_streamed_adamw=True, optimizer_offload=True, optimizer_offload_step=True)
+    settings.update(changes)
+    with pytest.raises(ValueError, match="offload|training"):
+        PearFSDPEngineConfig(**settings)
+
+
+@pytest.mark.parametrize("options", [{"amsgrad": True}, {"foreach": False}, {"differentiable": True}])
+def test_streaming_refuses_unsupported_adam_variants_before_allocating_cuda_buffers(options):
+    optimizer = torch.optim.AdamW([torch.nn.Parameter(torch.zeros(2))], **options)
+    with pytest.raises(ValueError, match="streamed AdamW requires"):
+        engine_module.StreamedAdamW(optimizer)
 
 
 @pytest.mark.parametrize("has_kernels", [True, False])

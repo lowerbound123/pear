@@ -66,6 +66,7 @@ Then start a Ray cluster and launch your first run:
 | Model | Recipes |
 | --- | --- |
 | [Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B) | [train](examples/models/qwen3_8_27b_pear/train), [deploy](examples/models/qwen3_8_27b_pear/deploy) |
+| [Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B) | [LIBERO train, export and eval on two A800 80GB GPUs](examples/models/qwen3_5_4b/README.md) (static checks only; GPU validation pending) |
 
 ## Supported Environments
 
@@ -90,6 +91,7 @@ Then start a Ray cluster and launch your first run:
 | --- | --- |
 | NVIDIA Blackwell | GB300, RTX 5090 (the model server) |
 | NVIDIA Hopper | H100, H200 |
+| NVIDIA Ampere | 2 x A800 80GB, Qwen3.5-4B LIBERO recipe (GPU validation pending) |
 
 ## Acknowledgment
 

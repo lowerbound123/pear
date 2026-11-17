@@ -8,16 +8,29 @@ from verl.workers.config import FSDPEngineConfig
 
 @dataclass
 class PearFSDPEngineConfig(FSDPEngineConfig):
-    """verl's FSDP engine config with the keys of PEAR's engine: a model family's training kernels and whether they
-    install a GPU generation's backend."""
+    """verl's FSDP config with model kernels, their GPU backend switch and independent optimizer streaming."""
 
     # a model family's training kernels, by class path (pear/models/kernels.py); None: verl's engine as it is
     kernels: str | None = None
     # whether the kernels install the backend of the machine's GPU generation, beside what they install on any GPU
     use_gpu_backend: bool = False
+    # None keeps the existing automatic choice (specialized GPU backend + step offload).
+    # True also enables streamed AdamW on the portable training path, e.g. Ampere.
+    use_streamed_adamw: bool | None = None
 
     def __post_init__(self) -> None:
         super().__post_init__()
+
+        if self.use_streamed_adamw and (
+            self.strategy != "fsdp2"
+            or not self.optimizer_offload
+            or not self.optimizer_offload_step
+            or self.offload_policy
+            or self.forward_only
+        ):
+            raise ValueError(
+                "use_streamed_adamw requires training FSDP2 with manual optimizer_offload and optimizer_offload_step"
+            )
 
         if self.use_gpu_backend and not self.kernels:
             raise ValueError(
@@ -30,7 +43,7 @@ class PearFSDPEngineConfig(FSDPEngineConfig):
                 "whose stream it is."
             )
         # importing this class registered PEAR's engine; another device or vendor key may still win the lookup
-        if self.kernels:
+        if self.kernels or self.use_streamed_adamw:
             PearFSDPEngine.require_registered(self.strategy)
 
 

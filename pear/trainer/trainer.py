@@ -45,6 +45,13 @@ class SessionCapMixin:
 
     def _replay_buffer_kwargs(self, replay_buffer_kwargs: dict[str, Any]) -> dict[str, Any]:
         max_inflight_sessions = self.config.trainer.v1.sampler.max_inflight_sessions
+        filter_groups = self.config.algorithm.get("filter_groups", {})
+        max_batches = filter_groups.get("max_num_gen_batches", 0)
+        # The upstream async buffer does not consume this synchronous-trainer option. Apply it to capped PEAR runs
+        # as judged groups per wait, including the initial groups. Zero keeps the existing unbounded behavior.
+        filter_budget = None
+        if max_inflight_sessions is not None and filter_groups.get("enable", False) and max_batches > 0:
+            filter_budget = max_batches * self.config.data.train_batch_size
 
         return dict(
             replay_buffer_kwargs,
@@ -52,6 +59,7 @@ class SessionCapMixin:
             max_inflight_sessions=max_inflight_sessions,
             # within the run's cap, what each family's servers take at once
             max_inflight_sessions_by_tool=None if max_inflight_sessions is None else self._session_caps_by_tool(),
+            filter_group_budget=filter_budget,
         )
 
     def _session_caps_by_tool(self) -> dict[str, int]:

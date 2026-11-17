@@ -1,5 +1,9 @@
 # Quick Start
 
+For a single Linux machine with two A800 80GB GPUs, use the
+[Qwen3.5-4B LIBERO guide](../../examples/models/qwen3_5_4b/README.md). It includes the combined Ray role and small-run
+defaults; this new path has static checks only and still needs GPU validation. The existing 27B setup follows below.
+
 **What you need**
 
 - PEAR installed: [Installation](installation.md)

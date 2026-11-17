@@ -85,3 +85,11 @@ def test_a_rollout_machine_registers_its_libero_slots_next_to_its_role(node_star
 
     # what a LIBERO family counts its servers from (server_n of its env class)
     assert json.loads(resources.removeprefix("--resources=")) == {"rollout": GPU_N, "libero": 12}
+
+
+def test_a_combined_machine_exposes_both_roles_and_two_physical_gpus(node_start):
+    arguments = node_start.run("combined")
+    [resources] = [argument for argument in arguments if argument.startswith("--resources=")]
+    assert json.loads(resources.removeprefix("--resources=")) == {"trainer": 1, "rollout": 1, "libero": 4}
+    assert "--num-gpus=2" in arguments
+    assert f"--object-store-memory={8 << 30}" in arguments

@@ -7,6 +7,8 @@ it installs is pinned in the repository.
 
 - **GPU**: NVIDIA GB300, H100 or H200, with a driver for CUDA 13. The model server also runs on an RTX 5090; the
   robot station needs no GPU
+  - The [Qwen3.5-4B LIBERO recipe](../../examples/models/qwen3_5_4b/README.md) adds two A800 80GB GPUs on one Linux
+    machine, using the same CUDA 13 stack. This path has static checks only; GPU execution is not yet validated.
 - **OS**: Linux on x86_64 or aarch64
 - **Tools**: bash 4.4 or newer, `git`, `curl`, `tar`, `patch`, `perl`, `gcc` and `g++`
 - **Network** while installing: PyPI, PyTorch's index, GitHub, conda-forge, the Hugging Face Hub and FlashInfer's
@@ -71,7 +73,7 @@ RoboDojo and RoboLab run Isaac Sim and need more setup. Their guides are coming 
 | --- | --- | --- |
 | `WORK_DIR` | all | The work directory. Required |
 | `MODEL_FILE` | `libero_run`, `scripts/download_model.sh` | The model to download. Default: `examples/models/qwen3_8_27b_pear/qwen3_8_27b.sh` |
-| `CUDA_ARCH` | `verl`, `libero_run` | The GPU to compile for when it is not the node's own: `10.3` for GB300, `9.0` for H100 and H200. A node without a GPU compiles for `10.3` |
+| `CUDA_ARCH` | `verl`, `libero_run` | The GPU to compile for when it is not the node's own: `8.0` for A800, `10.3` for GB300, `9.0` for H100 and H200. A node without a GPU compiles for `10.3` |
 | `MAX_JOBS` | `verl`, `libero_run` | Parallel compile jobs. Default: one per CPU, up to 64. Each needs about 5 GB of memory |
 | `NO_GPU=1` | `verl` | Skip what is compiled for a GPU. Enough for the CPU tests |
 
