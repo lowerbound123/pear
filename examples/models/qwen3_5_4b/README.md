@@ -66,6 +66,19 @@ simulator resources, and overrides that would request more than one GPU per pool
 
 ## Train and resume
 
+To train a single task on an installed two-GPU machine, run:
+
+```bash
+WORK_DIR=/srv/pear SUITE=libero_spatial TASK_ID=0 STEPS=20 \
+  bash examples/models/qwen3_5_4b/train/run_single_task.sh
+```
+
+This starts a combined Ray node and releases it when the command exits. Set `RAY_ADDRESS` to reuse your own
+combined node. Each launch prints its new run directory and saves the train and validation episode files there.
+Both files name only the selected suite and task. Trials 0–39 supply training initial states, and 40–49 are
+reserved for validation. The training command skips evaluation. Defaults are spatial task 0 and 20 optimizer
+steps with the recipe's usual reward-variance filter. Set `SMOKE=1` for the one-step connectivity check.
+
 Start with a one-step connectivity check in a new run directory:
 
 ```bash
