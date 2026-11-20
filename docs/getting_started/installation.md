@@ -10,8 +10,8 @@ it installs is pinned in the repository.
   - The [Qwen3.5-4B LIBERO recipe](../../examples/models/qwen3_5_4b/README.md) adds two A800 80GB GPUs on one Linux
     machine, using the same CUDA 13 stack. This path has static checks only; GPU execution is not yet validated.
 - **OS**: Linux on x86_64 or aarch64
-- **Tools**: bash 4.4 or newer, `git`, `curl`, `tar`, `patch`, `perl`, `gcc` and `g++`
-- **Network** while installing: PyPI, PyTorch's index, GitHub, conda-forge, the Hugging Face Hub and FlashInfer's
+- **Tools**: bash 4.4 or newer, `git`, `curl`, `tar`, `patch`, `perl`, `flock`, `gcc` and `g++`
+- **Network** while installing: PyPI, PyTorch's index, GitHub, conda-forge, the selected model hub and FlashInfer's
   wheel index
 - **A shared work directory**: every node of the cluster sees the same `WORK_DIR`
 
@@ -29,7 +29,7 @@ bash scripts/install.sh libero_run
 
 `libero_run` installs everything a LIBERO run needs, then checks it:
 
-1. The base model, from the Hugging Face Hub
+1. The base model, from the hub selected by `MODEL_SOURCE`
 2. The LIBERO simulator environment
 3. The training and rollout environment: PyTorch, vLLM, the patched veRL and PEAR
 4. A check on the GPU: the environment's tests, then one action in a simulator
@@ -73,6 +73,7 @@ RoboDojo and RoboLab run Isaac Sim and need more setup. Their guides are coming 
 | --- | --- | --- |
 | `WORK_DIR` | all | The work directory. Required |
 | `MODEL_FILE` | `libero_run`, `scripts/download_model.sh` | The model to download. Default: `examples/models/qwen3_8_27b_pear/qwen3_8_27b.sh` |
+| `MODEL_SOURCE` | `libero_run`, `scripts/download_model.sh` | Model weights: `huggingface` (default) or `modelscope` (modelscope.cn). Both shipped model files pin the corresponding ModelScope commit. |
 | `CUDA_ARCH` | `verl`, `libero_run` | The GPU to compile for when it is not the node's own: `8.0` for A800, `10.3` for GB300, `9.0` for H100 and H200. A node without a GPU compiles for `10.3` |
 | `MAX_JOBS` | `verl`, `libero_run` | Parallel compile jobs. Default: one per CPU, up to 64. Each needs about 5 GB of memory |
 | `NO_GPU=1` | `verl` | Skip what is compiled for a GPU. Enough for the CPU tests |

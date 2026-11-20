@@ -8,6 +8,7 @@
 # the base model on the Hugging Face Hub and its revision, which scripts/download_model.sh downloads
 MODEL_REPO=Qwen/Qwen3.8-27B
 MODEL_REVISION=1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0
+MODELSCOPE_REVISION=3532e456080026cf51f551b6df89f37fb2c00345
 # the model's answer parser, registered under rollout.multi_turn.format
 MODEL_MODULES=pear.models.qwen3_5.tool_parser
 # sessions a replica keeps generating, refilled as groups finish

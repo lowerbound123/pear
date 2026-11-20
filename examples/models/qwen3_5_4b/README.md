@@ -34,8 +34,14 @@ Run from the repository root. Use the same `WORK_DIR` in each terminal:
 ```bash
 export WORK_DIR=/srv/pear
 export MODEL_FILE="$PWD/examples/models/qwen3_5_4b/qwen3_5_4b.sh"
+export MODEL_SOURCE=modelscope
 CUDA_ARCH=8.0 bash scripts/install.sh libero_run
 ```
+
+This example downloads the [ModelScope snapshot](https://modelscope.cn/models/Qwen/Qwen3.5-4B) at
+`f09dfc75214c5f2f4940ae6a26c126ce93828a9b` into `$WORK_DIR/models/Qwen3.5-4B`. Both hubs have the same weight
+shards, tokenizer and processor files. Set `MODEL_SOURCE=huggingface` for the Hugging Face snapshot.
+A complete recorded download from either hub is reused. The selection applies to the model download only.
 
 The existing installer installs the pinned model, simulator, training stack and dependencies, then runs its GPU and
 simulator checks. It now builds FA2 for SM80 and skips FA3/FA4 on A800. It still installs the shared stack's LMCache

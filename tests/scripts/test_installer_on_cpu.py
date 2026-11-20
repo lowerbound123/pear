@@ -118,6 +118,10 @@ while [ "$#" -gt 1 ]; do
   shift
 done
 case "$arguments" in
+  *" ms download "*)
+    [ -z "${FAIL_MODELSCOPE:-}" ] || exit 2
+    mkdir -p "$directory" && echo model > "$directory/config.json"
+    ;;
   *assets.zip*) mkdir -p "$directory" && : > "$directory/assets.zip" ;;
   *--repo-type\\ model*) mkdir -p "$directory/.cache/huggingface" && echo model > "$directory/config.json" ;;
 esac
@@ -465,6 +469,48 @@ def test_the_model_is_fetched_once_and_anew_when_its_directory_is_not_what_its_r
     assert "< 6 ./config.json\n" in process.stdout and "> 12 ./config.json\n" in process.stdout
     assert len(installer.calls("uvx")) == 1
     assert (model_dir / "config.json").read_text() == "model\n"
+
+
+def test_libero_run_downloads_the_4b_model_from_its_modelscope_revision(installer):
+    model_file = installer.tree / "examples/models/qwen3_5_4b/qwen3_5_4b.sh"
+    revision = re.search(r"(?m)^MODELSCOPE_REVISION=([0-9a-f]{40})$", model_file.read_text())[1]
+    options = {"MODEL_FILE": str(model_file), "MODEL_SOURCE": "modelscope"}
+    process = installer.run("libero_run", GPU_ARCH="8.0", **options)
+    assert process.returncode == 0, process.stderr
+    downloads = installer.calls("uvx")
+    assert len(downloads) == 1
+    assert "ms download Qwen/Qwen3.5-4B --endpoint https://modelscope.cn" in downloads[0]
+    assert f"--revision {revision} --local-dir " in downloads[0]
+    model_dir = installer.work_dir / "models/Qwen3.5-4B"
+    assert f"modelscope_revision {revision}\n" in (model_dir / ".pear_model").read_text()
+    for source in ("modelscope", "huggingface"):
+        assert installer.run(script=DOWNLOAD_MODEL, MODEL_SOURCE=source, MODEL_FILE=str(model_file)).returncode == 0
+        assert not installer.calls("uvx")
+
+    (model_dir / "config.json").write_text("incomplete")
+    process = installer.run(script=DOWNLOAD_MODEL, FAIL_MODELSCOPE="1", **options)
+    assert process.returncode == 2
+    assert (model_dir / "config.json").read_text() == "incomplete"
+    assert len(installer.calls("uvx")) == 1
+    assert installer.run(script=DOWNLOAD_MODEL, **options).returncode == 0
+    assert (model_dir / "config.json").read_text() == "model\n"
+
+
+def test_modelscope_requires_a_pin_and_reuses_existing_recorded_hf_models(installer, tmp_path):
+    model_file = tmp_path / "model.sh"
+    model_file.write_text("MODEL_REPO=org/model\nMODEL_REVISION=abc\n")
+    process = installer.run(script=DOWNLOAD_MODEL, MODEL_FILE=str(model_file), MODEL_SOURCE="modelscope")
+    assert process.returncode != 0 and "MODELSCOPE_REVISION" in process.stderr
+    assert not installer.calls("uvx")
+    assert installer.run(script=DOWNLOAD_MODEL).returncode == 0
+    assert installer.run(script=DOWNLOAD_MODEL, MODEL_SOURCE="modelscope").returncode == 0
+    assert not installer.calls("uvx")
+
+
+def test_unknown_download_source_fails_before_network_access(installer):
+    process = installer.run(script=DOWNLOAD_MODEL, MODEL_SOURCE="typo")
+    assert process.returncode != 0 and "unknown MODEL_SOURCE" in process.stderr
+    assert not installer.calls("uvx")
 
 
 def test_after_its_cpu_targets_the_libero_run_only_finishes_and_checks(installer):

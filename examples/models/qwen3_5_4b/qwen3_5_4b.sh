@@ -3,6 +3,7 @@
 # The post-trained multimodal 4B checkpoint, pinned independently of the 27B model.
 MODEL_REPO=Qwen/Qwen3.5-4B
 MODEL_REVISION=851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
+MODELSCOPE_REVISION=f09dfc75214c5f2f4940ae6a26c126ce93828a9b
 MODEL_MODULES=pear.models.qwen3_5.tool_parser
 
 if [ "$GPU" != a800 ]; then
