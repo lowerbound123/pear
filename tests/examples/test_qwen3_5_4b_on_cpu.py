@@ -51,8 +51,6 @@ def test_a800_launches_compose_with_small_sizes_and_portable_backends(tmp_path, 
     policy = config["actor_rollout_ref"]
     rollout = policy["rollout"]
     assert config["data"]["max_prompt_length"] == 4096
-    assert config["data"]["max_response_length"] == 12288
-    assert rollout["max_model_len"] == 16384
     assert rollout["kernels"] is None
     assert rollout["tensor_model_parallel_size"] == 1
     assert rollout["standalone_gpu_memory_utilization"] == 0.7
@@ -62,8 +60,10 @@ def test_a800_launches_compose_with_small_sizes_and_portable_backends(tmp_path, 
     assert rollout["engine_kwargs"]["vllm"]["additional_config"]["gdn_prefill_backend"] == "triton"
     assert policy["actor"]["fsdp_config"]["use_gpu_backend"] is False
     assert config["transfer_queue"]["backend"]["SimpleStorage"]["num_data_storage_units"] == 4
-    assert rollout["max_num_seqs"] == 16
     if recipe == TRAIN:
+        assert config["data"]["max_response_length"] == 12288
+        assert rollout["max_model_len"] == 16384
+        assert rollout["max_num_seqs"] == 16
         assert (config["trainer"]["nnodes"], config["trainer"]["n_gpus_per_node"]) == (1, 1)
         assert (rollout["nnodes"], rollout["n_gpus_per_node"]) == (1, 1)
         assert rollout["agent"]["num_workers"] == 2
@@ -75,6 +75,12 @@ def test_a800_launches_compose_with_small_sizes_and_portable_backends(tmp_path, 
             assert config["trainer"]["total_training_steps"] == 1
             assert config["algorithm"]["filter_groups"]["enable"] is False
     else:
+        assert config["data"]["max_response_length"] == 160000
+        assert rollout["max_model_len"] == 164096
+        assert config["data"]["apply_chat_template_kwargs"]["enable_thinking"] is True
         assert rollout["n_gpus_per_node"] == 2
-        assert rollout["agent"]["num_workers"] == 4
+        assert config["run_sizes"]["sessions_per_replica"] == 4
+        assert rollout["max_num_seqs"] == 8
+        assert rollout["agent"]["num_workers"] == 2
+        assert config["trainer"]["v1"]["sampler"]["max_inflight_sessions"] == 8
         assert config["run_sizes"]["single_node_split"] is False

@@ -29,6 +29,7 @@ actor_rollout_ref:
     kernels: null
     standalone_gpu_memory_utilization: 0.70
     custom:
+      max_action_retries: 2  # regenerations per observation after invalid action JSON
       lmcache:
         enable: false
     multi_turn:

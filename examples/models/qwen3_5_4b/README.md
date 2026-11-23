@@ -6,9 +6,8 @@ It pins revision `851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a`. The language model 
 encoder, the checkpoint has about 4.66 billion parameters. These are the original Qwen weights, not a PEAR-trained
 robot policy. The newer Qwen-Drive 4B is a driving-specific model, outside this recipe's scope.
 
-**Validation status: static checks only, on macOS. Two-A800 execution, peak memory, numerical behavior and robot
-success rates have not been measured.** The commands below are for a Linux GPU server, not the Mac used to edit
-this repository. No model weights or training dependencies are needed for the static checks.
+On two A800 GPUs, standalone LIBERO evaluation has run with total context limits of 16,384 and 36,864 tokens.
+The 164,096-token evaluation profile still needs a GPU test. The commands below target the Linux GPU server.
 
 ## Hardware and execution
 
@@ -23,9 +22,13 @@ this repository. No model weights or training dependencies are needed for the st
 - Sampling uses native vLLM Qwen3.5, FA2, Triton GDN prefill and vLLM prefix caching; LMCache is disabled for this run.
   The shared embedding/head weights remain tied. Vision weights and `A_log` retain FP32 during sync and export.
 
-This is a conservative 16K-context starting point, not a reproduction of the 27B model's 160K/256K trajectories or
-reported benchmark scores. Truncation may prevent an episode from succeeding. There is no LoRA, Isaac Sim or robot
-station configuration in this recipe.
+Training starts with a 16,384-token context. Standalone evaluation uses 164,096 tokens to match the original
+27B stage-one context budget. Truncation may prevent an episode from succeeding.
+
+The 4B training and evaluation recipes allow two retries per observation if the model returns malformed action JSON
+or an action that fails schema validation. The model receives a text correction in the same episode. Each retry uses
+the remaining episode token budget. Set `actor_rollout_ref.rollout.custom.max_action_retries=0` when invoking
+`run_libero.sh` or `eval_libero.sh` to reproduce the single-attempt protocol.
 
 ## Install on the Linux GPU server
 
@@ -159,8 +162,19 @@ WORK_DIR=/srv/pear RUN=/srv/pear/runs/qwen35-4b-eval-step1 \
   bash examples/models/qwen3_5_4b/eval/eval_libero.sh
 ```
 
-To evaluate the original model, set `MODEL=/srv/pear/models/Qwen3.5-4B` and `EVAL_STEP=0`. Evaluation defaults to the
-same 16K budget and eight sessions per replica. Results are written under `RUN/val_dumps/` by the existing evaluator.
+To evaluate the original model, set `MODEL=/srv/pear/models/Qwen3.5-4B` and `EVAL_STEP=0`. The defaults are 4,096
+prompt tokens, 160,000 response tokens shared across the trajectory, thinking enabled, and four sessions per GPU.
+Results are written under `RUN/val_dumps/`.
+
+For a smaller first test, run the curriculum screening script from the pulled checkout. By default it starts its
+own rollout node on the server, evaluates trial 0 for each of the 30 Goal, Spatial and Object tasks, and prints
+a fresh run directory. Set `TRIALS=8` for eight initial states per task. The per-task results are in
+`task_rates.tsv` inside the run directory.
+
+```bash
+export WORK_DIR=/srv/pear
+bash examples/models/qwen3_5_4b/eval/screen_libero_tasks.sh
+```
 
 ## Verification boundary
 

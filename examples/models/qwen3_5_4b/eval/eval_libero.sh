@@ -11,7 +11,10 @@ export GPU=${GPU:-a800}
 export GPUS_PER_NODE=${GPUS_PER_NODE:-2}
 export ROLLOUT_NNODES=1
 export EVAL_STEP=${EVAL_STEP:-0} # zero for the base model, checkpoint step for an exported model
-export MAX_PROMPT=${MAX_PROMPT:-4096} MAX_RESPONSE=${MAX_RESPONSE:-12288}
-export SESSIONS_PER_REPLICA=${SESSIONS_PER_REPLICA:-8}
+export MAX_PROMPT=${MAX_PROMPT:-4096} MAX_RESPONSE=${MAX_RESPONSE:-160000}
+export SESSIONS_PER_REPLICA=${SESSIONS_PER_REPLICA:-4}
+
+printf 'Evaluation on %s GPUs: %s prompt + %s response tokens, %s sessions per replica.\n' \
+  "$GPUS_PER_NODE" "$MAX_PROMPT" "$MAX_RESPONSE" "$SESSIONS_PER_REPLICA"
 
 exec bash "$ROOT/examples/eval/eval_libero.sh" "$@"

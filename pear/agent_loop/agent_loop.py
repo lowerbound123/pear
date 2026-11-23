@@ -37,6 +37,9 @@ class PearAgentLoop(ToolAgentLoop):
         self.response_budget: int | None = None  # the trajectory's response tokens (run): its tool's, else the run's
         self.episode: Episode | None = None  # created when a run of the trajectory starts (run)
         self.end_reason: EndReason | None = None  # how the episode ended, once it has
+        self.max_action_retries = (self.rollout_config.custom or {}).get("max_action_retries", 0)
+        if type(self.max_action_retries) is not int or self.max_action_retries < 0:
+            raise ValueError("rollout.custom.max_action_retries must be a nonnegative integer")
 
     async def run(self, sampling_params: dict[str, Any], **kwargs) -> AgentLoopOutput:
         # the row's tool (EpisodeDataset), the only one verl's run then parses the answers for
@@ -49,6 +52,7 @@ class PearAgentLoop(ToolAgentLoop):
         # trajectory starts over in a new episode, the lost run discarded
         for restart in range(self.MAX_RESTARTS + 1):
             self.episode, self.end_reason = Episode(json.loads(kwargs["extra_info"]["env"])), None
+            self.action_retries = 0
             try:
                 output = await super().run(sampling_params, **kwargs)
                 break
@@ -148,8 +152,7 @@ class PearAgentLoop(ToolAgentLoop):
                     str(exc),
                     exc.answer[-self.LOG_TAIL_CHARS :],
                 )
-                self.end_reason = EndReason.PARSE
-                return AgentState.TERMINATED
+                return await self._retry_invalid_action(agent_data, str(exc))
 
         return AgentState.PROCESSING_TOOLS
 
@@ -160,9 +163,9 @@ class PearAgentLoop(ToolAgentLoop):
                 content, result = await self.tool.step(self.episode, action)
             except InvalidAction as exc:  # the block is not a valid action: the tool's reason
                 logger.warning("PARSE_FAILURE env=%s error=%r", self.episode.env_args, str(exc))
-                self.end_reason = EndReason.PARSE
-                return AgentState.TERMINATED
+                return await self._retry_invalid_action(agent_data, str(exc))
 
+        self.action_retries = 0
         self.episode.update(result)
 
         if self.episode.done:
@@ -170,6 +173,24 @@ class PearAgentLoop(ToolAgentLoop):
             return AgentState.TERMINATED
 
         return await self._resume_generating(agent_data, {"role": "user", "content": content})
+
+    async def _retry_invalid_action(self, agent_data: AgentData, reason: str) -> AgentState:
+        if self.action_retries >= self.max_action_retries:
+            self.end_reason = EndReason.PARSE
+            return AgentState.TERMINATED
+
+        schema = self.tool.env_class.SCHEMA
+        fields = "; ".join(f"{part} ({', '.join(names)})" for part, names in schema.items())
+        feedback = (
+            f"The action was rejected: {reason}. Use the same observation. "
+            f"Return one complete fenced ```json block with every field: {fields}. Use finite numeric values."
+        )
+        agent_data.tool_calls = []
+        state = await self._resume_generating(agent_data, {"role": "user", "content": feedback})
+        if state == AgentState.GENERATING:
+            self.action_retries += 1
+            logger.warning("ACTION_RETRY uid=%s attempt=%d reason=%s", self.episode.uid, self.action_retries, reason)
+        return state
 
     def _prompt_tool_schemas(self, agent_data: AgentData) -> list[dict[str, Any]]:
         # verl's are those of the tools the row selects (extra_info.tool_selection): a prompt of PEAR's renders none
