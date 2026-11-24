@@ -47,7 +47,7 @@ ENV_VAR=+ray_kwargs.ray_init.runtime_env.env_vars
 # ---- environment family ----
 # LIBERO: its servers on the rollout machines, one per CPU slot, each a simulator process in its environment,
 # rendering on the CPU
-TOOL_CONFIG=$ROOT/pear/envs/libero/configs/tool_config.yaml
+TOOL_CONFIG=${TOOL_CONFIG:-$ROOT/pear/envs/libero/configs/tool_config.yaml}
 # one 512 x 512 LIBERO frame in the model's tokens
 IMAGE_TOKENS=$(model_image_tokens 512 512)
 FAMILY_ARGS=(

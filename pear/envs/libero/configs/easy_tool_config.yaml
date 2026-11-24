@@ -1,0 +1,6 @@
+tools:
+  - class_name: pear.envs.tool.EnvironmentTool
+    config:
+      type: native
+      env_class: pear.envs.libero.easy_env.EasyMotionEnv
+      log_dir: ${oc.env:PEAR_LOG_DIR}

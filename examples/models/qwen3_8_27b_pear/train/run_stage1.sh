@@ -51,7 +51,7 @@ TRAINER_GPUS_PER_NODE=${TRAINER_GPUS_PER_NODE:-$GPUS_PER_NODE}
 ROLLOUT_GPUS_PER_NODE=${ROLLOUT_GPUS_PER_NODE:-$GPUS_PER_NODE}
 
 # ---- derived ----
-TOOL_CONFIG=$ROOT/pear/envs/libero/configs/tool_config.yaml
+TOOL_CONFIG=${TOOL_CONFIG:-$ROOT/pear/envs/libero/configs/tool_config.yaml}
 # one 512 x 512 LIBERO frame in the model's tokens
 IMAGE_TOKENS=$(model_image_tokens 512 512)
 # images in one prompt: only the token budget bounds the observations
@@ -66,7 +66,7 @@ START_TIME=$(date -u +%Y%m%dT%H%M%SZ)
 DATA_ARGS=(
   # the episode files, turned into rows by pear/agent_loop/dataset.py; validation on libero_goal's trials 40-49
   "data.train_files=[$EPISODES]"
-  "data.val_files=[$ROOT/pear/envs/libero/configs/libero_goal_val.json]"
+  "data.val_files=[${VAL_EPISODES:-$ROOT/pear/envs/libero/configs/libero_goal_val.json}]"
   data.max_prompt_length="$MAX_PROMPT"
   data.max_response_length="$MAX_RESPONSE"
   data.train_batch_size="$BATCH"

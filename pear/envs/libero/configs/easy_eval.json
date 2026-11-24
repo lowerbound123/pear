@@ -1,0 +1,14 @@
+{
+  "env_class": "pear.envs.libero.easy_env.EasyMotionEnv",
+  "data_source": "suite",
+  "env": {
+    "suite": [
+      "libero_easy_left",
+      "libero_easy_right"
+    ],
+    "task_id": "0-19",
+    "trial_id": [
+      2
+    ]
+  }
+}

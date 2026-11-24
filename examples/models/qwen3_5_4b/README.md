@@ -194,3 +194,22 @@ relevant CPU tests, then perform the following A800 acceptance checks:
    reward, action-parse and truncation metrics before scaling context or concurrency.
 
 No A800 throughput, peak-memory or learning-quality claim should be made until those checks have run.
+
+## Easy left/right motion curriculum
+
+PEAR's optional LIBERO extension places two independently controlled Panda arms on an empty LIBERO table.
+Each side has the same 20 English instructions. IDs 0–5 translate the tool, 6–11 tilt or turn it, 12–13
+open or close the gripper, and 14–19 combine two changes. Each instruction names the active side.
+The observations include both arms, both finger gaps, a front view and two wrist views. Pose and gap
+feedback come from MuJoCo. The binary reward uses the settled pose relative to the reset and requires
+the other arm to remain near its start. Contact, joint-margin and finger-clearance checks guard the rollout.
+
+Use the existing node-start command with the rollout role for evaluation or combined for training.
+The default evaluation covers 40 tasks on held-out start 2. Training uses starts 0 and 1.
+
+```bash
+export WORK_DIR=/srv/pear
+bash examples/models/qwen3_5_4b/run_easy.sh eval
+# On a combined node:
+bash examples/models/qwen3_5_4b/run_easy.sh train
+```

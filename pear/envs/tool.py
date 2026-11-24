@@ -118,6 +118,8 @@ class EnvironmentTool(BaseTool):
             return None
 
         text = JsonBlockProtocol.turn_text(result["state"], self.REMINDER)
+        if feedback := result.get("feedback"):
+            text += "\n\n" + feedback
         blocks: list[dict[str, Any]] = [{"type": "text", "text": text}]
 
         for name, image in zip(self.env_class.CAMERAS, result["images"]):
