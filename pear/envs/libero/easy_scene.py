@@ -17,7 +17,7 @@ from pear.envs.libero.easy_tasks import SIDES
 class EasyScene(TwoArmEnv):
     TABLE_Z = .8
     # Joint-space resets with a vertical hand. Shoulder, elbow and wrist pitch move together to preserve orientation.
-    STARTS = ((-.45, -2.18), (-.50, -2.20), (-.40, -2.15))
+    STARTS = ((.45, -2.45), (.55, -2.25), (.50, -2.35))
     CAMERAS = ("agentview", "robot0_eye_in_hand", "robot1_eye_in_hand")
 
     def __init__(self, trial_id, render):
@@ -61,6 +61,8 @@ class EasyScene(TwoArmEnv):
                 raise RuntimeError(f"Unsafe reset for {task}")
         self.neutral = [self.rotation(r) for r in self.robots]
         self.origin = self.quantities()
+        if not .105 <= self.clearance() <= .15:
+            raise RuntimeError(f"Initial finger clearance outside the calibrated band for {task}")
         if not self.at_rest() or task.reached(self.origin, self.origin):
             raise RuntimeError(f"Unsettled or already solved reset for {task}")
         i = SIDES.index(task.side)
@@ -88,6 +90,10 @@ class EasyScene(TwoArmEnv):
                    and np.linalg.norm(data.get_site_xvelr(r.controller.eef_name)) < .15
                    and np.max(np.abs(data.qvel[r._ref_gripper_joint_vel_indexes])) < .02 for r in self.robots)
 
+    def clearance(self):
+        return min(self.sim.data.geom_xpos[g, 2] - self.sim.model.geom_rbound[g] - self.TABLE_Z
+                   for g in self.finger_geoms)
+
     def unsafe(self):
         model, data = self.sim.model, self.sim.data
         for r in self.robots:
@@ -95,13 +101,13 @@ class EasyScene(TwoArmEnv):
             limits = model.jnt_range[r._ref_joint_indexes]
             if not np.all((limits[:, 0] + .04 < q) & (q < limits[:, 1] - .04)):
                 return True
-        for g in self.finger_geoms:
-            if data.geom_xpos[g, 2] - model.geom_rbound[g] < self.TABLE_Z + .045:
-                return True
+        if self.clearance() < .045:
+            return True
         for contact in data.contact[:data.ncon]:
-            a, b = (model.geom_id2name(g) or "" for g in (contact.geom1, contact.geom2))
+            a, b = (model.body_id2name(model.geom_bodyid[g]) or "" for g in (contact.geom1, contact.geom2))
             # Opposing pads of the same empty gripper can meet at full closure.
-            if any(a.startswith(f"gripper{i}_finger") and b.startswith(f"gripper{i}_finger") for i in range(2)):
+            if any(a.startswith(f"gripper{i}_") and b.startswith(f"gripper{i}_")
+                   and "finger" in a and "finger" in b for i in range(2)):
                 continue
             if any(s.startswith(("robot0_", "robot1_", "gripper0_", "gripper1_")) for s in (a, b)):
                 return True
@@ -111,9 +117,12 @@ class EasyScene(TwoArmEnv):
         native = np.zeros((2, 7))
         for i, r in enumerate(self.robots):
             # Both bases have identity orientation; OSC consumes world-frame position and axis-angle deltas.
-            native[i, :3] = (targets[i, :3] - current[i, :3]) / 2.0
+            site = r.controller.eef_name
+            native[i, :3] = (np.clip(.14 * (targets[i, :3] - current[i, :3]), -.28, .28)
+                             - .045 * self.sim.data.get_site_xvelp(site) / .07)
             goal = MotionController._rpy_to_matrix(targets[i, 3:6]) @ self.neutral[i]
             rot_error = MotionController._rotation(T.mat2quat(goal), T.mat2quat(self.rotation(r)))
-            native[i, 3:6] = rot_error / .20
+            native[i, 3:6] = (np.clip(1.8 * rot_error, -.36, .36)
+                              - .045 * self.sim.data.get_site_xvelr(site) / .55)
             native[i, 6] = -np.sign(width_changes[i])
         return np.clip(native, -1., 1.).ravel()
