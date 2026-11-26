@@ -213,3 +213,11 @@ bash examples/models/qwen3_5_4b/run_easy.sh eval
 # On a combined node:
 bash examples/models/qwen3_5_4b/run_easy.sh train
 ```
+
+For the step-25 follow-up, use a combined node and set `SOURCE_CHECKPOINT` to the original `global_step_25`
+directory and `MODEL` to its exported model. Run `bash examples/models/qwen3_5_4b/train/run_easy_focus.sh`.
+It restores AdamW and the actor, starts a fresh dataloader, and trains steps 26–75. Each five-step cycle
+covers 07, 08, 09, 17 and 19 once. The first four target both arms; 19 targets the right arm on both training
+starts. Each update uses two groups of four trajectories, including uniform-reward groups. Thinking is on
+with a 4,096-token prompt allowance and 258,048 response tokens shared across the episode. Every update is
+checkpointed and the newest two are retained. The held-out start is excluded from training.
